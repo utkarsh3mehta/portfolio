@@ -1,0 +1,1273 @@
+/* ==========================================================================
+   UTKARSH MEHTA — global styles
+   Everything themes through CSS variables (the Color Lab rewrites them live).
+   :root carries the ACID preset as the default so first paint is correct
+   before any JS runs (no flash of unstyled colours).
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;500;600;900&family=JetBrains+Mono:wght@400;700&display=swap');
+
+:root {
+  /* type — wired to the Google Fonts loaded above */
+  --font-anton: 'Anton', Impact, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --font-archivo: 'Archivo', system-ui, sans-serif;
+
+  --bg: #0a0a06;
+  --text: #f4f4ec;
+  --primary: #c6ff00;
+  --secondary: #ff10c4;
+  --highlight: #00ecff;
+  --grid: rgba(198, 255, 0, 0.06);
+  --particle: #c6ff00;
+  --cursor: #ff10c4;
+  --ui: #14140c;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-snap-type: y proximity;
+  scroll-behavior: smooth;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg, #0a0a06);
+}
+
+body {
+  background: var(--bg, #0a0a06);
+}
+
+::selection {
+  background: var(--primary, #c6ff00);
+  color: var(--bg, #0a0a06);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--primary, #c6ff00);
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* keyboard accessibility — visible focus even with the custom cursor on */
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* --------------------------------------------------------------------------
+   Keyframes
+   -------------------------------------------------------------------------- */
+@keyframes marqueeX {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+@keyframes blinkCur {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+@keyframes floatY {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-9px); }
+}
+@keyframes spin360 {
+  from { transform: rotate(0); }
+  to { transform: rotate(360deg); }
+}
+@keyframes gridPan {
+  from { background-position: 0 0; }
+  to { background-position: 64px 64px; }
+}
+@keyframes pulseDot {
+  0%, 100% { opacity: 0.35; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.5); }
+}
+@keyframes loadRise {
+  from { opacity: 0; transform: translateY(22px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes revRise {
+  from { opacity: 0; transform: translateY(36px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes revFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+/* product-mock motion */
+@keyframes streamIn {
+  from { width: 0; opacity: 0; }
+  to { opacity: 0.55; }
+}
+@keyframes snapDrop {
+  0% { transform: translateY(-10px); opacity: 0; }
+  60% { transform: translateY(2px); }
+  100% { transform: translateY(0); opacity: 1; }
+}
+@keyframes headSweep {
+  0%, 100% { transform: translateX(-30%); }
+  50% { transform: translateX(30%); }
+}
+@keyframes tapPulse {
+  0%, 100% { transform: scale(1); opacity: 0.9; }
+  50% { transform: scale(1.08); opacity: 1; }
+}
+@keyframes labIn {
+  from { transform: translateX(36px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@keyframes overlayIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Reduced motion: collapse every animation/transition to ~instant. */
+[data-reduced='1'] * {
+  animation-duration: 0.001s !important;
+  animation-delay: 0s !important;
+  animation-iteration-count: 1 !important;
+  animation-timeline: auto !important;
+  transition-duration: 0.001s !important;
+}
+
+/* --------------------------------------------------------------------------
+   Reveal utilities — content is ALWAYS visible by default. On browsers that
+   support scroll-driven timelines these scrub with the viewport; elsewhere
+   they simply play once and settle visible. Never a blank screen.
+   -------------------------------------------------------------------------- */
+.revealRise {
+  animation: revRise 0.9s linear both;
+  animation-timeline: view();
+  animation-range: entry 0% cover 30%;
+}
+.revealFade {
+  animation: revFade 0.8s linear both;
+  animation-timeline: view();
+  animation-range: entry 0% cover 28%;
+}
+/* one-shot hero entrances (time-based, not scroll-driven) */
+.heroKicker { animation: loadRise 0.8s 0.12s both; }
+.heroWord { animation: loadRise 1s 0.22s both; }
+.heroLine { animation: loadRise 0.9s 0.42s both; }
+
+/* --------------------------------------------------------------------------
+   Root + persistent layers
+   -------------------------------------------------------------------------- */
+.root {
+  position: relative;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-mono), 'JetBrains Mono', ui-monospace, monospace;
+}
+
+.bgCanvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 0;
+  display: block;
+}
+.gridOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 64px 64px;
+  animation: gridPan 28s linear infinite;
+}
+.scanlines {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0) 0px,
+    rgba(0, 0, 0, 0) 2px,
+    rgba(0, 0, 0, 0.15) 3px,
+    rgba(0, 0, 0, 0) 4px
+  );
+  mix-blend-mode: multiply;
+}
+
+/* living cursor */
+.cursorRing {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 34px;
+  height: 34px;
+  border: 1.5px solid var(--cursor);
+  border-radius: 50%;
+  z-index: 9999;
+  pointer-events: none;
+  transform: translate(-100px, -100px);
+  transition: width 0.18s, height 0.18s, border-radius 0.18s, background 0.18s;
+}
+.cursorDot {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 6px;
+  height: 6px;
+  background: #fff;
+  border-radius: 50%;
+  z-index: 9999;
+  pointer-events: none;
+  mix-blend-mode: difference;
+  transform: translate(-100px, -100px);
+}
+
+/* fixed HUD */
+.hud {
+  position: fixed;
+  top: 18px;
+  z-index: 70;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  line-height: 1.7;
+  mix-blend-mode: difference;
+  color: #fff;
+}
+.hudLeft { left: 22px; }
+.hudRight { right: 22px; text-align: right; }
+.hudDim { opacity: 0.7; }
+
+/* chapter progress dots */
+.dots {
+  position: fixed;
+  top: 50%;
+  right: 18px;
+  transform: translateY(-50%);
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text);
+  opacity: 0.28;
+  transition: opacity 0.3s, background 0.3s;
+}
+
+/* bottom marquee */
+.marquee {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 34px;
+  z-index: 70;
+  background: var(--primary);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  border-top: 1px solid var(--bg);
+}
+.marqueeTrack {
+  display: flex;
+  white-space: nowrap;
+  font-family: var(--font-archivo), 'Archivo', system-ui, sans-serif;
+  font-weight: 900;
+  font-size: 15px;
+  letter-spacing: 0.02em;
+  color: var(--bg);
+  animation: marqueeX 26s linear infinite;
+}
+.marqueeText { padding-right: 46px; }
+
+/* launcher buttons */
+.navBtn {
+  position: fixed;
+  bottom: 48px;
+  left: 22px;
+  z-index: 80;
+  background: transparent;
+  border: 1px solid var(--text);
+  color: var(--text);
+  font-family: var(--font-mono), 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  padding: 8px 12px;
+}
+.labBtn {
+  position: fixed;
+  bottom: 48px;
+  right: 22px;
+  z-index: 80;
+  background: var(--primary);
+  border: none;
+  color: var(--bg);
+  font-family: var(--font-archivo), 'Archivo', system-ui, sans-serif;
+  font-weight: 900;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  padding: 9px 14px;
+}
+
+.main {
+  position: relative;
+  z-index: 1;
+}
+
+/* --------------------------------------------------------------------------
+   Landing chapters
+   -------------------------------------------------------------------------- */
+.chapter {
+  position: relative;
+  height: 100vh;
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 28px;
+  overflow: hidden;
+}
+.chapterGhost {
+  position: absolute;
+  left: 3vw;
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: var(--font-anton), 'Anton', Impact, sans-serif;
+  font-size: 42vh;
+  line-height: 1;
+  color: var(--text);
+  opacity: 0.05;
+  pointer-events: none;
+}
+.kicker {
+  font-family: var(--font-archivo), 'Archivo', system-ui, sans-serif;
+  font-weight: 900;
+  font-size: 12px;
+  letter-spacing: 0.5em;
+  color: var(--secondary);
+  margin-bottom: 14px;
+  padding-left: 0.5em;
+}
+.chapterWord {
+  margin: 0;
+  font-family: var(--font-anton), 'Anton', Impact, sans-serif;
+  font-size: clamp(64px, 15vw, 240px);
+  line-height: 0.84;
+  color: var(--text);
+  text-align: center;
+  text-shadow: 4px 0 var(--secondary), -4px 0 var(--highlight);
+  letter-spacing: -0.01em;
+  max-width: 14ch;
+}
+.chapterLine {
+  margin-top: 26px;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  color: var(--text);
+  opacity: 0.78;
+  text-align: center;
+  max-width: 600px;
+}
+
+/* --------------------------------------------------------------------------
+   Shared section scaffolding
+   -------------------------------------------------------------------------- */
+.section {
+  position: relative;
+  max-width: 1180px;
+  margin: 0 auto;
+}
+.sectionLabel {
+  font-family: var(--font-archivo), 'Archivo', system-ui, sans-serif;
+  font-weight: 900;
+  font-size: 12px;
+  letter-spacing: 0.5em;
+  color: var(--secondary);
+  margin-bottom: 18px;
+}
+
+/* color utilities for inline terminal/console fragments */
+.cPrimary { color: var(--primary); }
+.cHigh { color: var(--highlight); }
+.cSec { color: var(--secondary); }
+.cWarn { color: #ffd23c; }
+
+/* --------------------------------------------------------------------------
+   WHO AM I
+   -------------------------------------------------------------------------- */
+.who { padding: 140px 28px 120px; }
+.whoTitle {
+  font-family: var(--font-anton), 'Anton', Impact, sans-serif;
+  font-size: clamp(48px, 9vw, 140px);
+  line-height: 0.86;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+.whoSub {
+  font-size: 12px;
+  color: var(--text);
+  opacity: 0.6;
+  max-width: 520px;
+  line-height: 1.7;
+  margin-bottom: 48px;
+}
+.cardGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 18px;
+  align-items: start;
+}
+.card {
+  border: 1px solid var(--text);
+  background: color-mix(in srgb, var(--ui) 70%, transparent);
+  padding: 18px;
+}
+.cardPrimary { border: 1px solid var(--primary); }
+.cardDashed {
+  border: 1px dashed var(--secondary);
+  background: color-mix(in srgb, var(--ui) 60%, transparent);
+  position: relative;
+}
+.cardLabel {
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: var(--secondary);
+  margin-bottom: 10px;
+}
+.termBody {
+  font-size: 12px;
+  line-height: 1.8;
+  color: var(--text);
+}
+.termCursor {
+  display: inline-block;
+  width: 8px;
+  height: 14px;
+  background: var(--primary);
+  animation: blinkCur 1s steps(1) infinite;
+  vertical-align: -2px;
+}
+.gitBody {
+  font-size: 11px;
+  line-height: 2;
+  color: var(--text);
+  opacity: 0.92;
+}
+.coordBig {
+  font-family: var(--font-anton), 'Anton', Impact, sans-serif;
+  font-size: 40px;
+  line-height: 1;
+  color: var(--text);
+}
+.coordSub {
+  font-size: 11px;
+  color: var(--text);
+  opacity: 0.6;
+  margin-top: 8px;
+}
+.consoleBody {
+  font-size: 11px;
+  line-height: 1.9;
+  color: var(--text);
+}
+.sketchSvg { width: 100%; height: auto; opacity: 0.8; }
+.deployBody {
+  font-size: 11px;
+  line-height: 2;
+  color: var(--text);
+  opacity: 0.9;
+}
+
+/* --------------------------------------------------------------------------
+   Projects — accordion index
+   -------------------------------------------------------------------------- */
+.projects { padding: 80px 28px 100px; }
+.projItem { border-top: 1px solid var(--text); }
+.projHeader {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 24px;
+  align-items: baseline;
+  padding: 26px 6px;
+  color: var(--text);
+  position: relative;
+  transition: padding-left 0.3s, color 0.3s;
+}
+.projHeader:hover { padding-left: 14px; color: var(--primary); }
+.projNum {
+  font-family: var(--font-mono), 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: var(--secondary);
+}
+.projName {
+  font-family: var(--font-anton), 'Anton', Impact, sans-serif;
+  font-size: clamp(34px, 6vw, 76px);
+  line-height: 0.9;
+  display: block;
+}
+.projLine {
+  font-size: 12px;
+  opacity: 0.65;
+  display: block;
+  margin-top: 8px;
+}
+.projTag {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--highlight);
+  white-space: nowrap;
+}
+.projEnd { border-top: 1px solid var(--text); }
+
+/* accordion panel */
+.projPanel {
+  overflow: hidden;
+  padding: 0 6px 32px;
+  animation: loadRise 0.5s ease both;
+}
+.projPanelGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 28px;
+  align-items: start;
+  padding-top: 6px;
+}
+.fieldLabel {
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: var(--secondary);
+  margin-bottom: 14px;
+}
+.fieldNote {
+  display: flex;
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text);
+  opacity: 0.9;
+  margin-bottom: 12px;
+}
+.fieldNote > span:first-child { color: var(--primary); flex: none; }
+.stackText {
+  font-family: var(--font-mono), 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: var(--highlight);
+  letter-spacing: 0.04em;
+  margin-bottom: 24px;
+}
+
+/* screen-mock window chrome */
+.screenMock {
+  border: 1px solid var(--text);
+  background: color-mix(in srgb, var(--bg) 65%, transparent);
+  margin-top: 26px;
+  overflow: hidden;
+}
+.screenChrome {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  border-bottom: 1px solid color-mix(in srgb, var(--text) 22%, transparent);
+}
+.chromeDots { display: flex; gap: 5px; }
+.chromeDot { width: 9px; height: 9px; border-radius: 50%; }
+.screenLabel {
+  font-family: var(--font-mono), 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text);
+  opacity: 0.6;
+  letter-spacing: 0.06em;
+}
+.liveTag {
+  margin-left: auto;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  color: var(--secondary);
+}
+
+/* ---- App Lab : block-coding studio ---- */
+.applab {
+  display: grid;
+  grid-template-columns: 148px 1fr;
+  gap: 20px;
+  padding: 20px;
+}
+.phone {
+  border: 2px solid var(--text);
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--bg) 80%, transparent);
+  padding: 12px 9px;
+  display: flex;
+  flex-direction: column;
+  animation: floatY 5.5s ease-in-out infinite;
+}
+.phoneTitle {
+  font-family: var(--font-archivo), 'Archivo', system-ui, sans-serif;
+  font-weight: 900;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--text);
+  text-align: center;
+  margin-bottom: 9px;
+}
+.phoneScreen {
+  flex: 1;
+  min-height: 150px;
+  border: 1px dashed color-mix(in srgb, var(--text) 30%, transparent);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 12px;
+}
+.phoneBall {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: var(--highlight);
+  animation: floatY 3.2s ease-in-out infinite;
+}
+.phoneScore {
+  font-family: var(--font-archivo), 'Archivo', system-ui, sans-serif;
+  font-weight: 900;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--text);
+  opacity: 0.6;
+}
+.phoneTap {
+  background: var(--primary);
+  color: var(--bg);
+  font-family: var(--font-archivo), 'Archivo', system-ui, sans-serif;
+  font-weight: 900;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  padding: 9px 18px;
+  border-radius: 8px;
+  animation: tapPulse 1.7s ease-in-out infinite;
+}
+.blockCanvas { display: flex; flex-direction: column; gap: 8px; }
+.blockCanvasLabel {
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: var(--secondary);
+  margin-bottom: 2px;
+}
+.blockRow {
+  color: var(--bg);
+  font-family: var(--font-mono), 'JetBrains Mono', monospace;
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  padding: 9px 14px;
+  animation: snapDrop 0.5s both;
+}
+.blockHint {
+  font-family: var(--font-mono), 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text);
+  opacity: 0.45;
+  margin-top: 6px;
+}
+
+/* ---- ARZEN : synchronized fleet wall ---- */
+.wall { padding: 16px; }
+.wallHead {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--text);
+  opacity: 0.6;
+  margin-bottom: 12px;
+}
+.wallGrid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 6px;
+}
+.wallCell {
+  aspect-ratio: 4 / 3;
+  border: 1px solid color-mix(in srgb, var(--text) 35%, transparent);
+  background: color-mix(in srgb, var(--bg) 70%, transparent);
+  position: relative;
+  overflow: hidden;
+  transition: background 0.25s, box-shadow 0.25s, border-color 0.25s;
+}
+.wallBars {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  bottom: 3px;
+  display: flex;
+  gap: 2px;
+  align-items: flex-end;
+  height: 42%;
+}
+.wallBar { flex: 1; background: color-mix(in srgb, var(--text) 30%, transparent); }
+
+/* ---- Dynamic Pricing : cinema occupancy ---- */
+.pricing {
+  display: grid;
+  grid-template-columns: 1fr 152px;
+  gap: 20px;
+  padding: 20px;
+}
+.screenCurve {
+  height: 8px;
+  width: 78%;
+  margin: 0 auto 5px;
+  background: var(--primary);
+  opacity: 0.8;
+  border-radius: 0 0 50% 50% / 0 0 14px 14px;
+}
+.screenWord {
+  text-align: center;
+  font-size: 9px;
+  letter-spacing: 0.34em;
+  color: var(--text);
+  opacity: 0.5;
+  margin-bottom: 14px;
+}
+.seatGrid {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  gap: 5px;
+}
+.seat {
+  aspect-ratio: 1;
+  border: 1px solid color-mix(in srgb, var(--text) 30%, transparent);
+  border-radius: 3px;
+  background: transparent;
+  transition: background 0.5s, border-color 0.5s;
+}
+.seatLegend {
+  display: flex;
+  gap: 18px;
+  margin-top: 14px;
+  font-size: 10px;
+  color: var(--text);
+  opacity: 0.6;
+}
+.legendChip {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  vertical-align: -1px;
+  margin-right: 4px;
+}
+.legendChip.sold { background: var(--primary); }
+.legendChip.open { border: 1px solid var(--text); }
+.priceSide {
+  border-left: 1px solid color-mix(in srgb, var(--text) 20%, transparent);
+  padding-left: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.miniLabel {
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: var(--secondary);
+}
+.priceVal {
+  font-family: var(--font-anton), 'Anton', Impact, sans-serif;
+  font-size: 46px;
+  line-height: 1;
+  color: var(--text);
+}
+.occVal {
+  font-family: var(--font-anton), 'Anton', Impact, sans-serif;
+  font-size: 30px;
+  line-height: 1.1;
+  color: var(--primary);
+}
+.trendVal {
+  margin-top: 12px;
+  font-family: var(--font-archivo), 'Archivo', system-ui, sans-serif;
+  font-weight: 900;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: var(--highlight);
+}
+
+/* ---- UnTaboo : calm lesson reader ---- */
+.untaboo {
+  padding: 36px 26px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  background: color-mix(in srgb, var(--ui) 45%, transparent);
+}
+.lessonKicker {
+  font-family: var(--font-mono), 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.32em;
+  color: var(--secondary);
+  margin-bottom: 14px;
+}
+.lessonTitle {
+  font-family: var(--font-anton), 'Anton', Impact, sans-serif;
+  font-size: clamp(24px, 3vw, 40px);
+  line-height: 1;
+  color: var(--text);
+  margin-bottom: 22px;
+  max-width: 440px;
+}
+.streamLines {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  width: 100%;
+  max-width: 380px;
+  align-items: center;
+}
+.streamLine {
+  height: 9px;
+  background: var(--text);
+  border-radius: 5px;
+  animation: streamIn 1.1s ease both;
+}
+.lessonSegs { display: flex; gap: 6px; margin-top: 26px; }
+.lessonSeg { width: 14px; height: 5px; border-radius: 3px; }
+.continueBtn {
+  margin-top: 24px;
+  border: 1px solid var(--text);
+  color: var(--text);
+  font-family: var(--font-archivo), 'Archivo', system-ui, sans-serif;
+  font-weight: 900;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  padding: 11px 24px;
+  border-radius: 40px;
+}
+
+/* ---- Shaping 3D : printer dashboard ---- */
+.shaping {
+  display: grid;
+  grid-template-columns: 1fr 168px;
+  gap: 18px;
+  padding: 20px;
+}
+.chamber {
+  position: relative;
+  height: 208px;
+  border: 1px solid color-mix(in srgb, var(--text) 25%, transparent);
+  background: color-mix(in srgb, var(--bg) 75%, transparent);
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 18px 18px;
+  overflow: hidden;
+}
+.printHead {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(10% + 6px);
+  height: 5px;
+  background: var(--secondary);
+  box-shadow: 0 0 12px var(--secondary);
+  animation: headSweep 1.5s ease-in-out infinite;
+}
+.printObj {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  transform: translateX(-50%);
+  width: 46%;
+  height: 18%;
+  background: repeating-linear-gradient(
+    0deg,
+    var(--primary) 0 3px,
+    color-mix(in srgb, var(--primary) 50%, var(--bg)) 3px 6px
+  );
+  transition: height 0.5s linear;
+}
+.printBase {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 8px;
+  background: var(--text);
+  opacity: 0.5;
+}
+.printSide { display: flex; flex-direction: column; gap: 15px; }
+.progVal {
+  font-family: var(--font-anton), 'Anton', Impact, sans-serif;
+  font-size: 38px;
+  line-height: 1;
+  color: var(--text);
+}
+.progTrack {
+  height: 6px;
+  background: color-mix(in srgb, var(--text) 20%, transparent);
+  margin-top: 7px;
+}
+.progBar { height: 100%; width: 6%; background: var(--primary); transition: width 0.5s linear; }
+.printStats { display: flex; gap: 12px; }
+.printStat { flex: 1; }
+.miniLabelSm {
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  color: var(--secondary);
+}
+.statVal {
+  font-family: var(--font-mono), 'JetBrains Mono', monospace;
+  font-size: 15px;
+  color: var(--highlight);
+}
+.statValText {
+  font-family: var(--font-mono), 'JetBrains Mono', monospace;
+  font-size: 15px;
+  color: var(--text);
+}
+.printBtns { display: flex; gap: 8px; margin-top: 2px; }
+.btnGhost {
+  flex: 1;
+  text-align: center;
+  border: 1px solid var(--text);
+  color: var(--text);
+  font-family: var(--font-archivo), 'Archivo', system-ui, sans-serif;
+  font-weight: 900;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  padding: 8px 0;
+}
+.btnDanger {
+  flex: 1;
+  text-align: center;
+  background: var(--secondary);
+  color: var(--bg);
+  font-family: var(--font-archivo), 'Archivo', system-ui, sans-serif;
+  font-weight: 900;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  padding: 8px 0;
+}
+
+/* --------------------------------------------------------------------------
+   Contact / vCard floppy
+   -------------------------------------------------------------------------- */
+.contact {
+  padding: 140px 28px 160px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.contactTitle {
+  font-family: var(--font-anton), 'Anton', Impact, sans-serif;
+  font-size: clamp(40px, 8vw, 120px);
+  line-height: 0.86;
+  color: var(--text);
+  margin-bottom: 10px;
+}
+.contactSub {
+  font-size: 12px;
+  color: var(--text);
+  opacity: 0.6;
+  margin-bottom: 40px;
+}
+.floppy {
+  position: relative;
+  width: 190px;
+  height: 190px;
+  background: var(--primary);
+  border: none;
+  padding: 0;
+  transition: transform 0.35s cubic-bezier(0.2, 0.9, 0.2, 1);
+}
+.floppyCorner {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 0 30px 30px 0;
+  border-color: transparent var(--bg) transparent transparent;
+}
+.floppyShutterR {
+  position: absolute;
+  top: 14px;
+  right: 30px;
+  width: 34px;
+  height: 46px;
+  background: var(--bg);
+}
+.floppyShutterL {
+  position: absolute;
+  top: 14px;
+  left: 18px;
+  width: 46px;
+  height: 46px;
+  background: color-mix(in srgb, var(--bg) 30%, var(--primary));
+  border: 2px solid var(--bg);
+}
+.floppyLabel {
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  bottom: 18px;
+  height: 96px;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0 12px;
+}
+.floppyLabelName {
+  font-family: var(--font-mono), 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--primary);
+  letter-spacing: 0.1em;
+}
+.floppyLabelSub {
+  font-size: 8px;
+  color: var(--text);
+  opacity: 0.7;
+  margin-top: 4px;
+}
+.floppyLabelBar {
+  margin-top: 8px;
+  height: 2px;
+  background: var(--primary);
+  opacity: 0.5;
+}
+.floppyHint {
+  font-size: 11px;
+  color: var(--text);
+  opacity: 0.5;
+  margin-top: 22px;
+}
+.footerLine {
+  margin-top: 80px;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--text);
+  opacity: 0.5;
+}
+
+/* --------------------------------------------------------------------------
+   Color Lab
+   -------------------------------------------------------------------------- */
+.lab {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 340px;
+  max-width: 88vw;
+  z-index: 90;
+  background: color-mix(in srgb, var(--ui) 92%, var(--bg));
+  border-left: 1px solid var(--primary);
+  box-shadow: -30px 0 80px rgba(0, 0, 0, 0.5);
+  overflow-y: auto;
+  padding: 24px 22px 60px;
+  animation: labIn 0.32s cubic-bezier(0.2, 0.9, 0.2, 1) both;
+}
+.labHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.labTitle {
+  font-family: var(--font-anton), 'Anton', Impact, sans-serif;
+  font-size: 28px;
+  color: var(--text);
+}
+.closeBtn {
+  background: none;
+  border: 1px solid var(--text);
+  color: var(--text);
+  width: 30px;
+  height: 30px;
+  font-size: 14px;
+}
+.labIntro {
+  font-size: 11px;
+  color: var(--text);
+  opacity: 0.6;
+  margin-bottom: 22px;
+}
+.labSectionLabel {
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: var(--secondary);
+  margin-bottom: 12px;
+}
+.presetGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 28px;
+}
+.presetBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 10px;
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--text) 25%, transparent);
+  color: var(--text);
+}
+.presetBtnActive {
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  border-color: var(--primary);
+}
+.swatches { display: flex; gap: 3px; margin-bottom: 8px; }
+.swatch { width: 14px; height: 14px; }
+.presetName {
+  font-family: var(--font-archivo), 'Archivo', system-ui, sans-serif;
+  font-weight: 900;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+}
+.swatchRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 0;
+  font-size: 11px;
+  color: var(--text);
+}
+.swatchRowLabel { letter-spacing: 0.08em; }
+.colorInput {
+  width: 44px;
+  height: 26px;
+  border: 1px solid var(--text);
+  background: none;
+  padding: 0;
+}
+.saveBtn {
+  width: 100%;
+  margin-top: 18px;
+  background: var(--primary);
+  border: none;
+  color: var(--bg);
+  font-family: var(--font-archivo), 'Archivo', system-ui, sans-serif;
+  font-weight: 900;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  padding: 12px;
+}
+.labSaved { margin-top: 26px; }
+.savedList { display: flex; flex-direction: column; gap: 6px; }
+.savedBtn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: none;
+  border: 1px solid color-mix(in srgb, var(--text) 30%, transparent);
+  color: var(--text);
+  padding: 8px 10px;
+  font-size: 11px;
+  text-align: left;
+}
+.savedSwatches { display: flex; gap: 2px; }
+.savedSwatch { width: 12px; height: 12px; }
+.labToggles {
+  margin-top: 30px;
+  border-top: 1px solid color-mix(in srgb, var(--text) 25%, transparent);
+  padding-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.toggleBtn {
+  display: flex;
+  justify-content: space-between;
+  background: none;
+  border: 1px solid var(--text);
+  color: var(--text);
+  padding: 10px 12px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+}
+.toggleVal { color: var(--primary); }
+
+/* --------------------------------------------------------------------------
+   Command palette
+   -------------------------------------------------------------------------- */
+.cmdOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: color-mix(in srgb, var(--bg) 70%, transparent);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 14vh;
+  animation: overlayIn 0.2s linear both;
+}
+.cmdBox {
+  width: 600px;
+  max-width: 92vw;
+  background: color-mix(in srgb, var(--ui) 94%, var(--bg));
+  border: 1px solid var(--primary);
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.6);
+}
+.cmdHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 18px;
+  border-bottom: 1px solid color-mix(in srgb, var(--text) 25%, transparent);
+}
+.cmdIcon { font-size: 18px; color: var(--primary); }
+.cmdInput {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-family: var(--font-mono), 'JetBrains Mono', monospace;
+  font-size: 16px;
+}
+.cmdEsc { font-size: 10px; color: var(--text); opacity: 0.5; }
+.cmdList { max-height: 54vh; overflow-y: auto; padding: 6px 0; }
+.cmdRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 11px 18px;
+  color: var(--text);
+  border-left: 2px solid transparent;
+}
+.cmdRowActive {
+  border-left-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+}
+.cmdKind { color: var(--secondary); font-size: 11px; width: 54px; }
+.cmdRowMain { display: flex; gap: 12px; align-items: center; }
+.cmdLabel { font-size: 13px; }
+.cmdHint { font-size: 11px; color: var(--text); opacity: 0.5; }
+.cmdEmpty { padding: 24px 18px; font-size: 12px; color: var(--text); opacity: 0.5; }
+
+/* When the custom cursor is active (fine pointer), hide the native one. */
+.cursorHidden,
+.cursorHidden * {
+  cursor: none;
+}

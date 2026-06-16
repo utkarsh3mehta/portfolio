@@ -1,36 +1,66 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Utkarsh Mehta — portfolio
 
-## Getting Started
+An experimental, anti-convention personal site. Built, not templated.
 
-First, run the development server:
+Implemented in **Next.js (App Router) + TypeScript**, ported from an HTML/CSS/JS
+prototype. The visual output is recreated faithfully; the structure is idiomatic
+React rather than a copy of the prototype's runtime.
+
+## What's in it
+
+- **Landing statement** — two scroll-snapped screens, `BUILDING SYSTEMS` /
+  `THAT SHOULD NOT WORK`, with chromatic-aberration display type.
+- **Generative background** — a ~460-particle flow-field painted on `<canvas>`,
+  recoloured live by the active palette.
+- **WHO AM I** — no bio; identity assembled from terminal output, a git log,
+  coordinates, console messages, an abandoned sketch and a deploy log.
+- **Projects accordion** — each row expands to field notes, stack, and a live
+  mockup of the actual product: App Lab's block-coding studio, ARZEN's
+  synchronized fleet wall, Dynamic Pricing's self-repricing cinema seat map,
+  UnTaboo's calm lesson reader, and Shaping 3D's printer dashboard.
+- **Color Lab** — slide-in panel with 8 presets, live per-channel tuning, and
+  custom combinations saved to `localStorage`.
+- **⌘K command palette** — searchable navigation, palette switching, toggles;
+  full keyboard control (↑/↓/↵/esc).
+- **Living cursor** — lerp-trailed ring + difference-blend dot that swells over
+  interactive elements (fine pointers only).
+- **vCard floppy** — hover ejects, click downloads a real `.vcf` (name, title,
+  phone, email, location).
+- **Accessibility** — honours `prefers-reduced-motion` (plus a manual toggle),
+  keyboard navigation, visible focus, optional UI blips (off by default).
+
+## Run it
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev      # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+```bash
+npm run build && npm start   # production
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Requires Node 18.18+ (Node 20+ recommended). Fonts (Anton, JetBrains Mono,
+Archivo) load from Google Fonts via a CSS `@import`, so the build itself works
+offline; the browser fetches the fonts at runtime.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Structure
 
-## Learn More
+```
+app/
+  layout.tsx     # fonts + metadata
+  page.tsx       # renders <Portfolio/>
+  globals.css    # base, keyframes, all component styles (themed via CSS vars)
+components/
+  Portfolio.tsx  # the whole living site (one client component)
+lib/
+  palettes.ts    # 8 presets + helpers
+  content.ts     # chapters, projects, marquee copy
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Theming
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Every colour flows through CSS custom properties on `:root` (default = the ACID
+preset, so first paint is correct before JS runs). The Color Lab rewrites those
+variables live; the canvas, cursor and node wall read the current palette from a
+ref so a swap recolours everything without re-rendering.
