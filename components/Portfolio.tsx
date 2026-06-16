@@ -5,12 +5,13 @@
 //
 // A faithful React/Next port of the handcrafted prototype. One client
 // component owns all state, refs and animation loops (canvas flow-field,
-// living cursor, ARZEN node wall, chapter dots, live clock). The DOM-driven
-// loops read the current palette through `palRef` so a palette swap recolours
-// everything instantly without re-rendering 50 nodes per frame.
+// living cursor, node walls, per-product sims, nav dots, live clock). The
+// DOM-driven loops read the current palette through `palRef` so a palette swap
+// recolours everything instantly without re-rendering.
 //
-// Sections: scroll chapters · WHO AM I · projects · ARZEN · contact,
-// plus the Color Lab, the ⌘K command palette and the alive cursor.
+// Opener: two scroll-snapped screens. Then WHO AM I, an accordion PROJECTS
+// index where each row expands a live mockup of the actual product, and the
+// vCard contact. Plus the Color Lab, the ⌘K command palette and the cursor.
 // ============================================================================
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -24,19 +25,40 @@ import {
 import {
   CHAPTERS,
   PROJECTS,
+  BLOCK_ROWS,
   MARQUEE_TEXT,
-  ARZEN_COUNT,
-  ARZEN_COLS,
-  ARZEN_ROWS,
+  NAV_SECTIONS,
+  WALL_COUNT,
+  WALL_COLS,
+  SEAT_COUNT,
+  UNTABOO_SEGMENTS,
+  UNTABOO_DONE,
 } from '@/lib/content';
 
 type Cmd = { id: string; kind: string; label: string; hint: string; act: () => void };
+
+type WallS = {
+  offline: Set<number>;
+  originX: number;
+  originY: number;
+  front: number;
+  active: boolean;
+  idle: number;
+};
 
 function now(): string {
   const d = new Date();
   const p = (n: number) => String(n).padStart(2, '0');
   return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 }
+
+// UnTaboo lesson reader: streaming text bars (width + entrance delay).
+const STREAM_LINES = [
+  { w: '94%', d: '0.1s' },
+  { w: '100%', d: '0.32s' },
+  { w: '88%', d: '0.54s' },
+  { w: '66%', d: '0.76s' },
+];
 
 type Props = {
   startPalette?: string;
@@ -63,6 +85,7 @@ export default function Portfolio({
   const [sound, setSound] = useState(soundDefault);
   const [reduced, setReduced] = useState(reducedMotion);
   const [cursorMode, setCursorMode] = useState<'none' | 'auto'>('none');
+  const [openProject, setOpenProject] = useState<number | null>(null);
 
   // ---- DOM refs ----
   const bgRef = useRef<HTMLCanvasElement>(null);
@@ -72,7 +95,7 @@ export default function Portfolio({
   const floppyRef = useRef<HTMLButtonElement>(null);
   const clockRef = useRef<HTMLSpanElement>(null);
 
-  // ---- mutable refs the rAF loops read live ----
+  // ---- mutable refs the loops read live ----
   const palRef = useRef<Palette>(initialPalette);
   const reducedRef = useRef<boolean>(reducedMotion);
   const soundRef = useRef<boolean>(soundDefault);
@@ -166,6 +189,12 @@ export default function Portfolio({
 
   const toggleReduced = () => setReduced((r) => !r);
 
+  const toggleProject = (idx: number) => {
+    const wasOpen = openProject === idx;
+    setOpenProject((o) => (o === idx ? null : idx));
+    blip(wasOpen ? 480 : 760);
+  };
+
   const saveCustom = () => {
     const name = `CUSTOM ${customs.length + 1}`;
     const next: SavedPalette[] = [...customs, { name, colors: { ...palRef.current } }];
@@ -180,7 +209,7 @@ export default function Portfolio({
 
   const downloadVcard = () => {
     const vcf =
-      'BEGIN:VCARD\nVERSION:3.0\nN:Mehta;Utkarsh;;;\nFN:Utkarsh Mehta\nTITLE:Software\nADR;TYPE=WORK:;;Mumbai;;;;India\nNOTE:Builds systems that should not work.\nEND:VCARD';
+      'BEGIN:VCARD\nVERSION:3.0\nN:Mehta;Utkarsh;;;\nFN:Utkarsh Mehta\nTITLE:Principal Software Engineer\nTEL;TYPE=CELL,VOICE:+919819642511\nEMAIL;TYPE=INTERNET:umtebiz@gmail.com\nADR;TYPE=WORK:;;Mumbai;;;;India\nNOTE:Builds systems that should not work.\nEND:VCARD';
     const blob = new Blob([vcf], { type: 'text/vcard' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -201,13 +230,12 @@ export default function Portfolio({
     if (floppyRef.current) floppyRef.current.style.transform = 'none';
   };
 
-  // ---- command list (depends only on query + toggle labels) ----
+  // ---- command list ----
   const filtered = useMemo<Cmd[]>(() => {
     const cmds: Cmd[] = [
       { id: 'top', kind: 'GOTO', label: 'Landing — the statement', hint: '↵', act: () => goto('top') },
       { id: 'who', kind: 'GOTO', label: 'Who am I — the fragments', hint: '↵', act: () => goto('who') },
       { id: 'projects', kind: 'GOTO', label: 'Projects — independent worlds', hint: '↵', act: () => goto('projects') },
-      { id: 'arzen', kind: 'GOTO', label: 'ARZEN — synchronized screen wall', hint: '↵', act: () => goto('arzen') },
       { id: 'contact', kind: 'GOTO', label: 'Contact — eject the vCard', hint: '↵', act: () => goto('contact') },
     ];
     PRESET_NAMES.forEach((name) =>
@@ -318,7 +346,7 @@ export default function Portfolio({
     // ----- generative flow-field background -----
     const rafs: number[] = [];
     let cursorRaf = 0;
-    let arzenRaf = 0;
+    let wallRaf = 0;
     let onResize: (() => void) | null = null;
 
     const canvas = bgRef.current;
@@ -424,96 +452,158 @@ export default function Portfolio({
       loop();
     }
 
-    // ----- ARZEN node wall: signal propagation + offline/recover -----
-    const startArzen = () => {
-      const cells = Array.from(document.querySelectorAll<HTMLElement>('[data-arzen-cell]'));
-      if (!cells.length) {
-        arzenRaf = requestAnimationFrame(() => window.setTimeout(startArzen, 400));
+    // ----- node walls: generalised driver for every [data-wall] (ARZEN) -----
+    const wallState = new Map<Element, WallS>();
+    const wallLoop = () => {
+      if (stopRef.current) return;
+      if (reducedRef.current) {
+        wallRaf = requestAnimationFrame(() => window.setTimeout(wallLoop, 200));
         return;
       }
-      const cols = ARZEN_COLS;
-      const offline = new Set<number>();
-      let originX = 0;
-      let originY = 0;
-      let front = 0;
-      let active = false;
-      let idle = 0;
-      const statusEl = document.getElementById('arzen-status');
-      const countEl = document.getElementById('arzen-count');
-      const loop = () => {
-        if (stopRef.current) return;
-        if (reducedRef.current) {
-          arzenRaf = requestAnimationFrame(() => window.setTimeout(loop, 200));
-          return;
+      const pal = palRef.current;
+      const walls = document.querySelectorAll<HTMLElement>('[data-wall]');
+      const liveSet = new Set<Element>(walls);
+      for (const key of Array.from(wallState.keys())) {
+        if (!liveSet.has(key)) wallState.delete(key);
+      }
+      walls.forEach((wall) => {
+        const cells = wall.querySelectorAll<HTMLElement>('[data-wall-cell]');
+        if (!cells.length) return;
+        const cols = parseInt(wall.dataset.wallCols || '10', 10);
+        const rows = Math.ceil(cells.length / cols);
+        let s = wallState.get(wall);
+        if (!s) {
+          s = {
+            offline: new Set<number>(),
+            originX: 0,
+            originY: 0,
+            front: 0,
+            active: false,
+            idle: Math.floor(Math.random() * 60),
+          };
+          wallState.set(wall, s);
         }
-        idle++;
-        if (!active && idle > 70) {
-          active = true;
-          idle = 0;
-          front = 0;
-          originX = Math.floor(Math.random() * cols);
-          originY = Math.floor(Math.random() * ARZEN_ROWS);
+        const ws = s;
+        const statusEl = wall.querySelector<HTMLElement>('[data-wall-status]');
+        const countEl = wall.querySelector<HTMLElement>('[data-wall-count]');
+        ws.idle++;
+        if (!ws.active && ws.idle > 70) {
+          ws.active = true;
+          ws.idle = 0;
+          ws.front = 0;
+          ws.originX = Math.floor(Math.random() * cols);
+          ws.originY = Math.floor(Math.random() * rows);
           if (statusEl) {
-            statusEl.textContent = `● SIGNAL FROM NODE ${originY * cols + originX}`;
-            statusEl.style.color = palRef.current.primary;
+            statusEl.textContent = `● SIGNAL FROM NODE ${ws.originY * cols + ws.originX}`;
+            statusEl.style.color = pal.primary;
           }
           blip(880);
         }
-        if (active) {
-          front += 0.5;
+        if (ws.active) {
+          ws.front += 0.5;
           cells.forEach((cell, i) => {
             const cx = i % cols;
             const cy = Math.floor(i / cols);
-            const d = Math.hypot(cx - originX, cy - originY);
-            const band = Math.abs(d - front);
-            if (offline.has(i)) {
-              cell.style.background = hexA(palRef.current.secondary, 0.12);
-              cell.style.borderColor = hexA(palRef.current.secondary, 0.6);
+            const d = Math.hypot(cx - ws.originX, cy - ws.originY);
+            const band = Math.abs(d - ws.front);
+            if (ws.offline.has(i)) {
+              cell.style.background = hexA(pal.secondary, 0.12);
+              cell.style.borderColor = hexA(pal.secondary, 0.6);
               cell.style.boxShadow = 'none';
             } else if (band < 0.9) {
-              cell.style.background = palRef.current.primary;
-              cell.style.borderColor = palRef.current.primary;
-              cell.style.boxShadow = `0 0 14px ${hexA(palRef.current.primary, 0.7)}`;
+              cell.style.background = pal.primary;
+              cell.style.borderColor = pal.primary;
+              cell.style.boxShadow = `0 0 14px ${hexA(pal.primary, 0.7)}`;
             } else {
-              cell.style.background = hexA(palRef.current.bg, 0.7);
-              cell.style.borderColor = hexA(palRef.current.text, 0.35);
+              cell.style.background = hexA(pal.bg, 0.7);
+              cell.style.borderColor = hexA(pal.text, 0.35);
               cell.style.boxShadow = 'none';
             }
           });
-          if (front > 16) {
-            active = false;
+          if (ws.front > Math.hypot(cols, rows) + 1) {
+            ws.active = false;
             if (statusEl) statusEl.textContent = `● SYNCED · ${new Date().toLocaleTimeString()}`;
             if (Math.random() > 0.4) {
               const k = Math.floor(Math.random() * cells.length);
-              offline.add(k);
-              if (countEl) countEl.textContent = String(ARZEN_COUNT - offline.size);
+              ws.offline.add(k);
+              if (countEl) countEl.textContent = String(cells.length - ws.offline.size);
               window.setTimeout(() => {
-                offline.delete(k);
-                if (countEl) countEl.textContent = String(ARZEN_COUNT - offline.size);
+                ws.offline.delete(k);
+                if (countEl) countEl.textContent = String(cells.length - ws.offline.size);
               }, 2600);
             }
           }
         }
-        arzenRaf = requestAnimationFrame(loop);
-      };
-      loop();
+      });
+      wallRaf = requestAnimationFrame(wallLoop);
     };
-    startArzen();
+    wallLoop();
 
-    // ----- chapter progress dots (plain scroll listener) -----
-    const chapterEls = Array.from(document.querySelectorAll<HTMLElement>('[data-chapter]'));
+    // ----- per-product sims (only the open accordion has these nodes) -----
+    const simTimer = window.setInterval(() => {
+      if (stopRef.current || reducedRef.current) return;
+
+      // DYNAMIC PRICING — cinema occupancy & price
+      document.querySelectorAll<HTMLElement>('[data-sim="pricing"]').forEach((root) => {
+        let occ = parseFloat(root.dataset.occ || '58');
+        occ += (Math.random() - 0.42) * 6;
+        occ = Math.max(24, Math.min(98, occ));
+        root.dataset.occ = String(occ);
+        const price = Math.round((180 + (occ / 100) * 360) / 10) * 10;
+        const occEl = root.querySelector<HTMLElement>('[data-occ-val]');
+        if (occEl) occEl.textContent = `${occ.toFixed(0)}%`;
+        const priceEl = root.querySelector<HTMLElement>('[data-price-val]');
+        if (priceEl) priceEl.textContent = `₹${price}`;
+        const trendEl = root.querySelector<HTMLElement>('[data-trend]');
+        if (trendEl) trendEl.textContent = occ > 70 ? 'SURGE ↑' : occ < 40 ? 'EASING ↓' : 'STEADY →';
+        const seats = root.querySelectorAll<HTMLElement>('[data-seat]');
+        const fill = Math.round((seats.length * occ) / 100);
+        seats.forEach((s, i) => {
+          const on = i < fill;
+          s.style.background = on ? 'var(--primary)' : 'transparent';
+          s.style.borderColor = on ? 'var(--primary)' : hexA(palRef.current.text, 0.3);
+        });
+      });
+
+      // SHAPING 3D — print progress, layers, temps
+      document.querySelectorAll<HTMLElement>('[data-sim="shaping3d"]').forEach((root) => {
+        let prog = parseFloat(root.dataset.prog || '6');
+        prog += 1.4;
+        if (prog > 100) prog = 4;
+        root.dataset.prog = String(prog);
+        const pEl = root.querySelector<HTMLElement>('[data-prog-val]');
+        if (pEl) pEl.textContent = `${prog.toFixed(0)}%`;
+        const barEl = root.querySelector<HTMLElement>('[data-prog-bar]');
+        if (barEl) barEl.style.width = `${prog}%`;
+        const objEl = root.querySelector<HTMLElement>('[data-print-obj]');
+        if (objEl) objEl.style.height = `${10 + prog * 0.78}%`;
+        const headEl = root.querySelector<HTMLElement>('[data-print-head]');
+        if (headEl) headEl.style.bottom = `calc(${10 + prog * 0.78}% + 6px)`;
+        const layEl = root.querySelector<HTMLElement>('[data-layer-val]');
+        if (layEl) layEl.textContent = `${String(Math.round(prog * 2.4)).padStart(3, '0')}/240`;
+        const nz = root.querySelector<HTMLElement>('[data-nozzle]');
+        if (nz) nz.textContent = `${205 + Math.round(Math.sin(prog / 7) * 4)}°C`;
+        const bd = root.querySelector<HTMLElement>('[data-bed]');
+        if (bd) bd.textContent = `${60 + Math.round(Math.cos(prog / 11) * 2)}°C`;
+      });
+    }, 650);
+
+    // ----- nav progress dots (plain scroll listener over 5 sections) -----
+    const navEls = NAV_SECTIONS.map((sel) => document.querySelector<HTMLElement>(sel)).filter(
+      (el): el is HTMLElement => !!el,
+    );
     const dotEls = Array.from(document.querySelectorAll<HTMLElement>('[data-dot]'));
     const updateChapter = () => {
       const mid = window.innerHeight / 2;
       let best = 0;
       let bestD = Infinity;
-      chapterEls.forEach((el) => {
+      navEls.forEach((el, i) => {
         const r = el.getBoundingClientRect();
         const c = r.top + r.height / 2;
         const d = Math.abs(c - mid);
         if (d < bestD) {
           bestD = d;
-          best = parseInt(el.dataset.chapter || '0', 10);
+          best = i;
         }
       });
       dotEls.forEach((d) => {
@@ -538,9 +628,10 @@ export default function Portfolio({
     return () => {
       stopRef.current = true;
       window.clearInterval(clockTimer);
+      window.clearInterval(simTimer);
       rafs.forEach((id) => cancelAnimationFrame(id));
       if (cursorRaf) cancelAnimationFrame(cursorRaf);
-      if (arzenRaf) cancelAnimationFrame(arzenRaf);
+      if (wallRaf) cancelAnimationFrame(wallRaf);
       if (onMove) window.removeEventListener('mousemove', onMove);
       if (onResize) window.removeEventListener('resize', onResize);
       window.removeEventListener('scroll', onScroll);
@@ -593,10 +684,10 @@ export default function Portfolio({
         <span className="hudDim">19.0760°N 72.8777°E</span>
       </div>
 
-      {/* chapter progress dots */}
+      {/* nav progress dots — one per section */}
       <div className="dots" aria-hidden>
-        {CHAPTERS.map((c) => (
-          <span key={c.i} data-dot={c.i} className="dot" />
+        {NAV_SECTIONS.map((_, i) => (
+          <span key={i} data-dot={i} className="dot" />
         ))}
       </div>
 
@@ -618,7 +709,7 @@ export default function Portfolio({
 
       {/* ============ CONTENT ============ */}
       <main id="top" className="main">
-        {/* CHAPTERS */}
+        {/* CHAPTERS — two screens */}
         {CHAPTERS.map((ch) => (
           <section
             key={ch.i}
@@ -643,7 +734,6 @@ export default function Portfolio({
           <div className="whoSub revealRise">No biography. Assemble the fragments yourself.</div>
 
           <div className="cardGrid">
-            {/* terminal */}
             <div className="card revealFade" style={{ transform: 'rotate(-1deg)' }}>
               <div className="cardLabel">$ TERMINAL</div>
               <div className="termBody">
@@ -659,7 +749,6 @@ export default function Portfolio({
               </div>
             </div>
 
-            {/* git log */}
             <div className="card revealFade" style={{ transform: 'rotate(0.6deg)' }}>
               <div className="cardLabel">GIT LOG</div>
               <div className="gitBody">
@@ -675,7 +764,6 @@ export default function Portfolio({
               </div>
             </div>
 
-            {/* coordinates */}
             <div className="card cardPrimary revealFade" style={{ transform: 'rotate(-0.8deg)' }}>
               <div className="cardLabel">COORDINATES</div>
               <div className="coordBig">19.0760°N</div>
@@ -685,7 +773,6 @@ export default function Portfolio({
               <div className="coordSub">MUMBAI · GMT+5:30 · ALWAYS DEPLOYING</div>
             </div>
 
-            {/* console */}
             <div className="card revealFade" style={{ transform: 'rotate(1deg)' }}>
               <div className="cardLabel">CONSOLE</div>
               <div className="consoleBody">
@@ -699,7 +786,6 @@ export default function Portfolio({
               </div>
             </div>
 
-            {/* abandoned sketch */}
             <div className="card cardDashed revealFade" style={{ transform: 'rotate(-1.4deg)' }}>
               <div className="cardLabel">SKETCH · v1 (ABANDONED)</div>
               <svg viewBox="0 0 200 90" className="sketchSvg">
@@ -711,7 +797,6 @@ export default function Portfolio({
               </svg>
             </div>
 
-            {/* deploy log */}
             <div className="card revealFade" style={{ transform: 'rotate(0.4deg)' }}>
               <div className="cardLabel">DEPLOY LOG</div>
               <div className="deployBody">
@@ -729,64 +814,235 @@ export default function Portfolio({
           </div>
         </section>
 
-        {/* PROJECTS */}
+        {/* PROJECTS — accordion index, each opens a live product mockup */}
         <section id="projects" data-screen-label="PROJECTS" className="section projects">
           <div className="sectionLabel revealRise">INDEX / INDEPENDENT WORLDS</div>
-          {PROJECTS.map((p) => (
-            <a key={p.n} href={p.href} data-cursor="link" className="projRow revealRise">
-              <span className="projNum">{p.n}</span>
-              <span>
-                <span className="projName">{p.name}</span>
-                <span className="projLine">{p.line}</span>
-              </span>
-              <span className="projTag">{p.tag} ↗</span>
-            </a>
-          ))}
-          <div className="projEnd" />
-        </section>
+          {PROJECTS.map((p, idx) => {
+            const open = openProject === idx;
+            return (
+              <div key={p.n} className="projItem revealRise">
+                <div
+                  data-cursor="link"
+                  data-proj
+                  onClick={() => toggleProject(idx)}
+                  className="projHeader"
+                >
+                  <span className="projNum">{p.n}</span>
+                  <span>
+                    <span className="projName">{p.name}</span>
+                    <span className="projLine">{p.line}</span>
+                  </span>
+                  <span className="projTag">
+                    {p.tag}
+                    {open ? '  −' : '  +'}
+                  </span>
+                </div>
 
-        {/* ARZEN PROJECT WORLD */}
-        <section id="arzen" data-screen-label="ARZEN" className="arzen">
-          <div className="arzenInner">
-            <div className="arzenHead">
-              <div className="arzenTitle revealRise">ARZEN</div>
-              <div className="arzenMeta revealRise">
-                FLEET CONFIG SYNC
-                <br />
-                ENTER ANOTHER UNIVERSE →
-              </div>
-            </div>
-            <div className="arzenStatement revealRise">
-              One update reaches thousands. Synchronization becomes performance art.
-            </div>
+                {open && (
+                  <div className="projPanel">
+                    <div className="projPanelGrid">
+                      <div>
+                        <div className="fieldLabel">{'// FIELD NOTES'}</div>
+                        {p.details.map((d, i) => (
+                          <div key={i} className="fieldNote">
+                            <span>▸</span>
+                            <span>{d}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <div>
+                        <div className="fieldLabel">{'// STACK'}</div>
+                        <div className="stackText">{p.stack}</div>
+                      </div>
+                    </div>
 
-            <div className="arzenBox">
-              <div className="arzenBoxHead">
-                <span>
-                  NODE WALL · <span id="arzen-count" style={{ color: 'var(--primary)' }}>{ARZEN_COUNT}</span> ONLINE
-                </span>
-                <span id="arzen-status" style={{ color: 'var(--primary)' }}>
-                  ● PROPAGATING
-                </span>
-              </div>
-              <div className="arzenGrid">
-                {Array.from({ length: ARZEN_COUNT }, (_, i) => (
-                  <div key={i} data-arzen-cell={i} className="arzenCell">
-                    <div className="cellBars">
-                      <span className="bar" style={{ height: '60%' }} />
-                      <span className="bar" style={{ height: '90%' }} />
-                      <span className="bar" style={{ height: '40%' }} />
+                    <div className="screenMock">
+                      <div className="screenChrome">
+                        <span className="chromeDots">
+                          <span className="chromeDot" style={{ background: 'var(--secondary)' }} />
+                          <span className="chromeDot" style={{ background: '#ffd23c' }} />
+                          <span className="chromeDot" style={{ background: 'var(--primary)' }} />
+                        </span>
+                        <span className="screenLabel">{p.screenLabel}</span>
+                        <span className="liveTag">● LIVE</span>
+                      </div>
+
+                      {/* APP LAB — block-coding studio */}
+                      {p.kind === 'applab' && (
+                        <div className="applab">
+                          <div className="phone">
+                            <div className="phoneTitle">MY FIRST APP</div>
+                            <div className="phoneScreen">
+                              <div className="phoneBall" />
+                              <div className="phoneScore">SCORE 07</div>
+                              <div className="phoneTap">TAP ME</div>
+                            </div>
+                          </div>
+                          <div className="blockCanvas">
+                            <div className="blockCanvasLabel">BLOCK CANVAS</div>
+                            {BLOCK_ROWS.map((b, i) => (
+                              <div
+                                key={i}
+                                className="blockRow"
+                                style={{ background: b.bg, marginLeft: b.ind * 22, animationDelay: b.d }}
+                              >
+                                {b.t}
+                              </div>
+                            ))}
+                            <div className="blockHint">drag a block · preview updates instantly</div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* ARZEN — synchronized fleet wall */}
+                      {p.kind === 'arzen' && (
+                        <div data-wall data-wall-cols={WALL_COLS} className="wall">
+                          <div className="wallHead">
+                            <span>
+                              FLEET · <span data-wall-count style={{ color: 'var(--primary)' }}>{WALL_COUNT}</span> SCREENS ONLINE
+                            </span>
+                            <span data-wall-status style={{ color: 'var(--primary)' }}>
+                              ● PROPAGATING
+                            </span>
+                          </div>
+                          <div className="wallGrid">
+                            {Array.from({ length: WALL_COUNT }, (_, i) => (
+                              <div key={i} data-wall-cell className="wallCell">
+                                <div className="wallBars">
+                                  <span className="wallBar" style={{ height: '60%' }} />
+                                  <span className="wallBar" style={{ height: '90%' }} />
+                                  <span className="wallBar" style={{ height: '40%' }} />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* DYNAMIC PRICING — cinema occupancy */}
+                      {p.kind === 'pricing' && (
+                        <div data-sim="pricing" data-occ="58" className="pricing">
+                          <div>
+                            <div className="screenCurve" />
+                            <div className="screenWord">SCREEN</div>
+                            <div className="seatGrid">
+                              {Array.from({ length: SEAT_COUNT }, (_, i) => (
+                                <div key={i} data-seat className="seat" />
+                              ))}
+                            </div>
+                            <div className="seatLegend">
+                              <span>
+                                <span className="legendChip sold" />
+                                SOLD
+                              </span>
+                              <span>
+                                <span className="legendChip open" />
+                                OPEN
+                              </span>
+                            </div>
+                          </div>
+                          <div className="priceSide">
+                            <div className="miniLabel">PRICE / SEAT</div>
+                            <div data-price-val className="priceVal">
+                              ₹390
+                            </div>
+                            <div className="miniLabel" style={{ marginTop: 16 }}>
+                              OCCUPANCY
+                            </div>
+                            <div data-occ-val className="occVal">
+                              58%
+                            </div>
+                            <div data-trend className="trendVal">
+                              STEADY →
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* UNTABOO — calm lesson reader */}
+                      {p.kind === 'untaboo' && (
+                        <div className="untaboo">
+                          <div className="lessonKicker">LESSON 03 · OF 12</div>
+                          <div className="lessonTitle">CONSENT &amp; BOUNDARIES</div>
+                          <div className="streamLines">
+                            {STREAM_LINES.map((l, i) => (
+                              <span
+                                key={i}
+                                className="streamLine"
+                                style={{ width: l.w, animationDelay: l.d }}
+                              />
+                            ))}
+                          </div>
+                          <div className="lessonSegs">
+                            {Array.from({ length: UNTABOO_SEGMENTS }, (_, i) => (
+                              <span
+                                key={i}
+                                className="lessonSeg"
+                                style={{
+                                  background:
+                                    i < UNTABOO_DONE
+                                      ? 'var(--primary)'
+                                      : 'color-mix(in srgb, var(--text) 22%, transparent)',
+                                }}
+                              />
+                            ))}
+                          </div>
+                          <div className="continueBtn">CONTINUE →</div>
+                        </div>
+                      )}
+
+                      {/* SHAPING 3D — printer dashboard */}
+                      {p.kind === 'shaping3d' && (
+                        <div data-sim="shaping3d" data-prog="6" className="shaping">
+                          <div className="chamber">
+                            <div data-print-head className="printHead" />
+                            <div data-print-obj className="printObj" />
+                            <div className="printBase" />
+                          </div>
+                          <div className="printSide">
+                            <div>
+                              <div className="miniLabel">PROGRESS</div>
+                              <div data-prog-val className="progVal">
+                                6%
+                              </div>
+                              <div className="progTrack">
+                                <div data-prog-bar className="progBar" />
+                              </div>
+                            </div>
+                            <div className="printStats">
+                              <div className="printStat">
+                                <div className="miniLabelSm">NOZZLE</div>
+                                <div data-nozzle className="statVal">
+                                  205°C
+                                </div>
+                              </div>
+                              <div className="printStat">
+                                <div className="miniLabelSm">BED</div>
+                                <div data-bed className="statVal">
+                                  60°C
+                                </div>
+                              </div>
+                            </div>
+                            <div>
+                              <div className="miniLabelSm">LAYER</div>
+                              <div data-layer-val className="statValText">
+                                014/240
+                              </div>
+                            </div>
+                            <div className="printBtns">
+                              <span className="btnGhost">PAUSE</span>
+                              <span className="btnDanger">ABORT</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
-                ))}
+                )}
               </div>
-              <div className="arzenLegend">
-                <span>◆ signal travels visually</span>
-                <span>◆ offline nodes reconnect</span>
-                <span>◆ failures recover</span>
-              </div>
-            </div>
-          </div>
+            );
+          })}
+          <div className="projEnd" />
         </section>
 
         {/* CONTACT / VCARD */}

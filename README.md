@@ -8,21 +8,24 @@ React rather than a copy of the prototype's runtime.
 
 ## What's in it
 
-- **Landing chapters** — six scroll-snapped screens, one massive word each
-  (`BUILDING / SYSTEMS / THAT / SHOULD / NOT / WORK`) with chromatic-aberration type.
+- **Landing statement** — two scroll-snapped screens, `BUILDING SYSTEMS` /
+  `THAT SHOULD NOT WORK`, with chromatic-aberration display type.
 - **Generative background** — a ~460-particle flow-field painted on `<canvas>`,
   recoloured live by the active palette.
 - **WHO AM I** — no bio; identity assembled from terminal output, a git log,
   coordinates, console messages, an abandoned sketch and a deploy log.
-- **Projects index + ARZEN world** — a 50-node screen wall where signals
-  propagate, nodes drop offline and recover, and the status narrates itself.
+- **Projects accordion** — each row expands to field notes, stack, and a live
+  mockup of the actual product: App Lab's block-coding studio, ARZEN's
+  synchronized fleet wall, Dynamic Pricing's self-repricing cinema seat map,
+  UnTaboo's calm lesson reader, and Shaping 3D's printer dashboard.
 - **Color Lab** — slide-in panel with 8 presets, live per-channel tuning, and
   custom combinations saved to `localStorage`.
 - **⌘K command palette** — searchable navigation, palette switching, toggles;
   full keyboard control (↑/↓/↵/esc).
 - **Living cursor** — lerp-trailed ring + difference-blend dot that swells over
   interactive elements (fine pointers only).
-- **vCard floppy** — hover ejects, click downloads a real `.vcf`.
+- **vCard floppy** — hover ejects, click downloads a real `.vcf` (name, title,
+  phone, email, location).
 - **Accessibility** — honours `prefers-reduced-motion` (plus a manual toggle),
   keyboard navigation, visible focus, optional UI blips (off by default).
 
